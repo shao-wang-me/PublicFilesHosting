@@ -1,0 +1,92 @@
+<!DOCTYPE html> <!-- 这个表示这是一个HTML5文档 -->
+<!-- 参见https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/HTML5/Introduction_to_HTML5 -->
+<html lang="zh">
+
+<head>
+  <meta charset="UTF-8"> <!-- 要紧跟着head -->
+  <!-- 复制自https://developer.mozilla.org/en-US/docs/Web/HTML/Viewport_meta_tag#viewport_basics -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sleep</title>
+  <!-- 载入react和react-dom，注意在生产环境要换成*.production.js -->
+  <!-- 截至2022年11月，React的最新大版本号是18 -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- 启用JSX，参见https://reactjs.org/docs/add-react-to-a-website.html#quickly-try-jsx -->
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+</head>
+
+<body>
+  <!-- 提示启用JavaScript -->
+  <noscript>
+    <p>该页面需要启用JavaScript。</p>
+  </noscript>
+
+  <!-- 用于React渲染组件 -->
+  <div id="app"></div>
+
+  <!-- 载入React组件 -->
+  <!-- 需要type="text/babel"，参见https://reactjs.org/docs/add-react-to-a-website.html#quickly-try-jsx -->
+  <script type="text/babel">
+    'use strict';
+    const {useState, useEffect, useCallback, useMemo, Fragment} = React;
+
+    const NINE_HOURS_IN_MILLISECONDS = 1000 * 60 * 60 * 9;
+    const A_DAY_IN_MILLISECONDS = 1000 * 60 * 60 * 24;
+
+    function App() {
+      /*
+      const sampleResults = {
+        "sunrise": "2022-12-10T18:49:52+00:00",
+        "sunset": "2022-12-11T09:36:31+00:00",
+        "solar_noon": "2022-12-11T02:13:11+00:00",
+        "day_length": 53199,
+        "civil_twilight_begin": "2022-12-10T18:20:18+00:00",
+        "civil_twilight_end": "2022-12-11T10:06:04+00:00",
+        "nautical_twilight_begin": "2022-12-10T17:41:23+00:00",
+        "nautical_twilight_end": "2022-12-11T10:44:59+00:00",
+        "astronomical_twilight_begin": "2022-12-10T16:57:26+00:00",
+        "astronomical_twilight_end": "2022-12-11T11:28:56+00:00"
+      };
+      */
+      const [results, setResults] = useState();
+      const [now] = useState(new Date());
+
+      useEffect(() => {
+        // https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API/Using_the_Geolocation_API#getting_the_current_position
+        navigator.geolocation.getCurrentPosition(position => {
+          // https://sunrise-sunset.org/api
+          const url = `https://api.sunrise-sunset.org/json?lat=${position.coords.latitude}&lng=${position.coords.longitude}&formatted=0`;
+          fetch(url).then(res => res.json()).then(json => setResults(
+            Object.fromEntries(Object.entries(json.results).map(([k, v]) => [k, new Date(v)]))
+          ));
+        });
+      }, []);
+
+      const formatTime = useCallback(date => `${date.getHours()}时${date.getMinutes()}分`, []);
+      const millisecondsToHours = useCallback(ms => (ms / 1000 / 60 / 60).toFixed(2), []);
+      const millisecondsTillSunrise = useMemo(() => results && results.sunrise - now + A_DAY_IN_MILLISECONDS, [results, now]);
+
+      useEffect(() => {
+        if (!results) {return;}
+        if (millisecondsTillSunrise <= NINE_HOURS_IN_MILLISECONDS) {
+          document.body.style.backgroundColor = '#ff8170';
+        } else {document.body.style.backgroundColor = '#c1f07f';}
+      }, [results, millisecondsTillSunrise]);
+
+      return (<div>
+        <p>日出日落时间来自 https://sunrise-sunset.org/api。</p>
+        <p>日出日落时间是不准的，都是今天时间。</p>
+        <p>现在是{formatTime(now)}。</p>
+        {results && (<Fragment>
+          <p>日出是{formatTime(results.sunrise)}，距离日出还有{millisecondsToHours(millisecondsTillSunrise)}小时。</p>
+          {millisecondsTillSunrise <= NINE_HOURS_IN_MILLISECONDS && <p>距离日出不到九小时，该睡了！</p>}
+        </Fragment>)}
+      </div>);
+    }
+
+    const container = document.getElementById('app');
+    ReactDOM.createRoot(container).render(<App/>);
+  </script>
+</body>
+
+</html> 
